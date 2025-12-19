@@ -7,7 +7,10 @@ export default defineConfig({
             '/stream-http': {
                 target: 'http://localhost:3000',
                 changeOrigin: true,
-                // secure: false, // not strictly needed for http
+            },
+            '/stream-upstream': {
+                target: 'http://localhost:3000',
+                changeOrigin: true,
             }
         }
     }

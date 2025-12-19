@@ -243,4 +243,70 @@ export class AppController {
       clearTimeout(safetyTimeout);
     });
   }
+
+  @Get('stream-upstream')
+  async streamUpstream(@Res() res: FastifyReply) {
+    console.log('New UPSTREAM stream connection initiated');
+
+    // 1. Create a controller to manage the upstream fetch call
+    const upstreamController = new AbortController();
+
+    // 2. [CRITICAL] Attach listener BEFORE any 'await'
+    // If the client disconnects while we are waiting for the upstream API, this fires immediately.
+    res.raw.on('close', () => {
+      console.log('Client disconnected. Aborting upstream request...');
+      upstreamController.abort();
+    });
+
+    try {
+      // 3. Start the upstream request
+      // We use httpbin.org to simulate a stream of 100 lines (longer duration)
+      const response = await fetch('https://httpbin.org/stream/500', {
+        signal: upstreamController.signal
+      });
+
+      if (!response.body) {
+        throw new Error('No response body from upstream');
+      }
+
+      console.log('Upstream connected. Piping data...');
+
+      // Set headers for our client
+      res.raw.setHeader('Content-Type', 'application/json');
+      res.raw.setHeader('Transfer-Encoding', 'chunked');
+
+      // 4. Pipe the upstream stream to our client
+      // Node.js ReadableStream (from fetch) can be piped to the generic WritableStream (res.raw)
+      // Note: native fetch body is a Web Stream, so we might need to iterate if Node version < 20 or use utility
+      // For Node 18, we can iterate:
+
+      // @ts-ignore
+      for await (const chunk of response.body) {
+        if (res.raw.writableEnded) break;
+
+        // Artificial delay to allow user time to click Cancel
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        res.raw.write(chunk);
+        console.log('Proxied chunk >>');
+      }
+
+      if (!res.raw.writableEnded) {
+        res.raw.end();
+        console.log('Upstream stream finished normally');
+      }
+
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('Successfully aborted upstream request to save resources.');
+      } else {
+        console.error('Upstream error:', err);
+        if (!res.raw.writableEnded) {
+          res.raw.statusCode = 502;
+          res.raw.write(JSON.stringify({ error: 'Upstream failed' }));
+          res.raw.end();
+        }
+      }
+    }
+  }
 }

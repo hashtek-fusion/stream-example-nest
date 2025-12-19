@@ -43,6 +43,14 @@
   <h1>Cross-Origin RxJS Stream (Vite + ESM)</h1>
   <p>Server: <code>http://localhost:3000</code> | Client: <code>http://localhost:8080</code> (Vite)</p>
 
+  <p>
+    <label for="endpointSelect">Choose Endpoint:</label>
+    <select id="endpointSelect">
+      <option value="/stream-http">Local Simulation (/stream-http)</option>
+      <option value="/stream-upstream">Upstream Proxy (/stream-upstream)</option>
+    </select>
+  </p>
+
   <button id="startBtn">Start Stream (Cross-Origin)</button>
   <button id="cancelBtn" disabled>Cancel Stream (Unsubscribe)</button>
 
@@ -91,9 +99,10 @@
       startBtn.disabled = true;
       cancelBtn.disabled = false;
 
-      log(`Subscribing to fromFetch(${SERVER_URL})...`, 'info');
+      const endpoint = document.getElementById('endpointSelect').value;
+      log(`Subscribing to fromFetch(${endpoint})...`, 'info');
 
-      subscription = fromFetch(SERVER_URL).pipe(
+      subscription = fromFetch(endpoint).pipe(
         switchMap(response => {
           if (response.ok) {
             log('Response headers received (Status 200)', 'success');
