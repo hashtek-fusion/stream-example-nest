@@ -217,7 +217,6 @@ export class AppController {
     res.raw.setHeader('Transfer-Encoding', 'chunked');
     res.raw.setHeader('Cache-Control', 'no-cache');
     res.raw.setHeader('Connection', 'keep-alive');
-    res.raw.setHeader('Access-Control-Allow-Origin', '*');
 
     let counter = 0;
     const interval = setInterval(() => {

@@ -74,8 +74,8 @@
     const cancelBtn = document.getElementById('cancelBtn');
     const logsDiv = document.getElementById('logs');
 
-    // Explicit cross-origin URL
-    const SERVER_URL = 'http://localhost:3000/stream-http';
+    // Relative URL (proxied by Vite)
+    const SERVER_URL = '/stream-http';
 
     function log(message, type = '') {
       const div = document.createElement('div');
