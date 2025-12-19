@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Cross-Origin RxJS Stream (Vite)</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+    }
+
+    #logs {
+      background: #f0f0f0;
+      padding: 10px;
+      height: 300px;
+      overflow-y: scroll;
+      border: 1px solid #ccc;
+      margin-top: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-right: 10px;
+      cursor: pointer;
+    }
+
+    .error {
+      color: red;
+    }
+
+    .success {
+      color: green;
+    }
+
+    .info {
+      color: blue;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Cross-Origin RxJS Stream (Vite + ESM)</h1>
+  <p>Server: <code>http://localhost:3000</code> | Client: <code>http://localhost:8080</code> (Vite)</p>
+
+  <button id="startBtn">Start Stream (Cross-Origin)</button>
+  <button id="cancelBtn" disabled>Cancel Stream (Unsubscribe)</button>
+
+  <div id="logs"></div>
+
+  <!-- Global Error Handler (must be non-module to catch module errors) -->
+  <script>
+    window.onerror = function (msg, url, lineNo, columnNo, error) {
+      const logsDiv = document.getElementById('logs');
+      if (logsDiv) {
+        const div = document.createElement('div');
+        div.style.color = 'red';
+        div.style.fontWeight = 'bold';
+        div.textContent = `Page Error: ${msg} (Line ${lineNo})`;
+        logsDiv.appendChild(div);
+      }
+      return false;
+    };
+    console.log('Global error handler attached');
+  </script>
+
+  <script type="module">
+    import { fromFetch } from 'rxjs/fetch';
+    import { switchMap } from 'rxjs/operators';
+    import { Observable, throwError } from 'rxjs';
+
+    let subscription = null;
+    const startBtn = document.getElementById('startBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const logsDiv = document.getElementById('logs');
+
+    // Explicit cross-origin URL
+    const SERVER_URL = 'http://localhost:3000/stream-http';
+
+    function log(message, type = '') {
+      const div = document.createElement('div');
+      div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      if (type) div.className = type;
+      logsDiv.appendChild(div);
+      logsDiv.scrollTop = logsDiv.scrollHeight;
+      console.log(message);
+    }
+
+    startBtn.addEventListener('click', () => {
+      logsDiv.innerHTML = '';
+      startBtn.disabled = true;
+      cancelBtn.disabled = false;
+
+      log(`Subscribing to fromFetch(${SERVER_URL})...`, 'info');
+
+      subscription = fromFetch(SERVER_URL).pipe(
+        switchMap(response => {
+          if (response.ok) {
+            log('Response headers received (Status 200)', 'success');
+            // response.body is a ReadableStream
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            return new Observable(observer => {
+              function read() {
+                reader.read().then(({ done, value }) => {
+                  if (done) {
+                    observer.complete();
+                    return;
+                  }
+                  const text = decoder.decode(value, { stream: true });
+                  observer.next(text);
+                  read();
+                }).catch(err => observer.error(err));
+              }
+              read();
+
+              // Teardown logic
+              return () => {
+                log('Teardown: canceling reader', 'info');
+                reader.cancel();
+              };
+            });
+          } else {
+            return throwError(() => new Error('HTTP Error ' + response.status));
+          }
+        })
+      ).subscribe({
+        next: (value) => log('Received: ' + value.trim()),
+        error: (err) => {
+          log('Error: ' + err, 'error');
+          resetButtons();
+        },
+        complete: () => {
+          log('Stream complete', 'success');
+          resetButtons();
+        }
+      });
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      if (subscription) {
+        log('Unsubscribing...', 'info');
+        subscription.unsubscribe();
+        subscription = null;
+        log('Request aborted via Unsubscribe', 'error');
+        resetButtons();
+      }
+    });
+
+    function resetButtons() {
+      startBtn.disabled = false;
+      cancelBtn.disabled = true;
+    }
+  </script>
+</body>
+
+</html>

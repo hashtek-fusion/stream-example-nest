@@ -217,6 +217,7 @@ export class AppController {
     res.raw.setHeader('Transfer-Encoding', 'chunked');
     res.raw.setHeader('Cache-Control', 'no-cache');
     res.raw.setHeader('Connection', 'keep-alive');
+    res.raw.setHeader('Access-Control-Allow-Origin', '*');
 
     let counter = 0;
     const interval = setInterval(() => {
@@ -237,7 +238,7 @@ export class AppController {
       }
     }, 60000);
 
-    req.raw.on('close', () => {
+    res.raw.on('close', () => {
       console.log(`Client connection closed. Stopping stream after ${counter} chunks.`);
       clearInterval(interval);
       clearTimeout(safetyTimeout);
